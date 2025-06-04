@@ -20,3 +20,4 @@ class Empresa(Base):
     inversion = relationship("Inversion", back_populates="empresa")
     venta = relationship("Venta", back_populates="empresa")
     perdidas = relationship("Perdidas", back_populates="empresa")
+    gastos = relationship("Gastos", back_populates="empresa")

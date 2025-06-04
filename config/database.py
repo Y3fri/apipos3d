@@ -5,7 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 
 password = quote("Y3f3r#@+")
-mysql_file_name = f"mysql+mysqlconnector://root:{password}@localhost:3306/tienda2"
+mysql_file_name = f"mysql+mysqlconnector://root:{password}@localhost:3306/pos3d"
 
 
 #password = quote("Y3f3rGuzm4n")

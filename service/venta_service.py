@@ -36,12 +36,11 @@ class VentaService:
                 "ven_usuario": venta.ven_usuario,
                 "ven_fecha": venta.ven_fecha,
                 "ven_hora": venta.ven_hora,                
-                "ven_total": venta.ven_total,
-                "ven_cliente_fia": venta.ven_cliente_fia, 
+                "ven_total": venta.ven_total,                
                 "ven_cliente_contado": venta.ven_cliente_contado,
                 "ven_dinero_recibido": venta.ven_dinero_recibido,
                 "ven_cambio": venta.ven_cambio,
-                "ven_descuento": venta.ven_descuento,
+                "ven_descuento": venta.ven_descuento,                
                 "nombre_tansaccion": venta.transacciones.tra_nombre,                
                 "nombre_pago": venta.metodo_pago.pag_nombre,                  
             }
@@ -78,15 +77,13 @@ class VentaService:
             VentaModel.ven_fecha <= fecha_fin
         )
 
-        # Manejo del filtro de tipo de pago
+        # Manejo del filtro de tipo de transacción
         if filtro_transaccion == "Contado":
             query = query.filter(VentaModel.ven_transacciones == 1)
-        elif filtro_transaccion == "Fiado":
+        elif filtro_transaccion == "Credito":
             query = query.filter(VentaModel.ven_transacciones == 2)
-        elif filtro_transaccion == "Regalado":
-            query = query.filter(VentaModel.ven_transacciones == 3)  # Regalado puede ser identificado por un total de 0
         elif filtro_transaccion != "Todo":
-            raise ValueError("Filtro de pago no válido. Opciones: Todo, Contado, Fiado, Regalado.")
+            raise ValueError("Filtro de transacción no válido. Opciones: Todo, Contado, Crédito.")
 
         # Ejecutar la consulta
         result = query.all()
@@ -101,12 +98,11 @@ class VentaService:
                 "ven_usuario": venta.ven_usuario,
                 "ven_fecha": venta.ven_fecha,
                 "ven_hora": venta.ven_hora,
-                "ven_total": venta.ven_total,
-                "ven_cliente_fia": venta.ven_cliente_fia,
+                "ven_total": venta.ven_total,                
                 "ven_cliente_contado": venta.ven_cliente_contado,
                 "ven_dinero_recibido": venta.ven_dinero_recibido,
                 "ven_cambio": venta.ven_cambio,
-                "ven_descuento": venta.ven_descuento,
+                "ven_descuento": venta.ven_descuento,                
                 "nombre_tansaccion": venta.transacciones.tra_nombre,
                 "nombre_pago": venta.metodo_pago.pag_nombre,
             }
@@ -114,134 +110,6 @@ class VentaService:
         ]
 
         return venta_list
-    
-
-    def get_fiado(self):
-        try:
-            # Agrupar por cliente y calcular total fiado, total abonado y saldo pendiente
-            results = (
-                self.db.query(
-                    VentaModel.ven_cliente_fia,  
-                    func.sum(VentaModel.ven_total).label("total_fiado")                    
-                )
-                .filter(VentaModel.ven_transacciones == 2)  # Filtrar solo transacciones con valor 2
-                .group_by(VentaModel.ven_cliente_fia)
-                .all()
-            )
-
-            # Convertir los resultados en una lista de diccionarios
-            fiados = [
-                {
-                    "ven_cliente_fia": row.ven_cliente_fia, 
-                    "total_fiado": row.total_fiado,                     
-                }
-                for row in results
-            ]
-
-            return fiados if fiados else []  # Retornar lista vacía si no hay datos
-
-        except SQLAlchemyError as e:
-            self.db.rollback()
-            raise ValueError(f"Error: {str(e)}")
-        
-    def get_fiado_cliente(self, nombre_cliente: str):
-        try:
-            # Obtener todas las ventas fiadas del cliente
-            ventas = (
-                self.db.query(VentaModel)
-                .filter(VentaModel.ven_cliente_fia == nombre_cliente)
-                .filter(VentaModel.ven_transacciones == 2)  # 2 para ventas fiadas
-                .all()
-            )
-                        
-            return [
-                {
-                    "ven_id": venta.ven_id,
-                    "ven_empresa": venta.ven_empresa,
-                    "ven_transacciones": venta.ven_transacciones,
-                    "ven_pago": venta.ven_pago,
-                    "ven_usuario": venta.ven_usuario,
-                    "ven_fecha": venta.ven_fecha,
-                    "ven_hora": venta.ven_hora,
-                    "ven_total": venta.ven_total,
-                    "ven_cliente_fia": venta.ven_cliente_fia,
-                    "ven_cliente_contado": venta.ven_cliente_contado,
-                    "ven_dinero_recibido": venta.ven_dinero_recibido,
-                    "ven_cambio": venta.ven_cambio,
-                    "ven_descuento": venta.ven_descuento,                                                    
-                }
-                for venta in ventas
-            ]
-            
-        except SQLAlchemyError as e:
-            self.db.rollback()
-            raise ValueError(f"Error al obtener ventas fiadas: {str(e)}")
-
-    def update_fiado(self, nombre_cliente: str, usu_id: int):
-        try:
-            current_datetime = datetime.now(bogota_timezone)
-            current_date = current_datetime.date()
-            current_time = current_datetime.time().replace(microsecond=0)
-
-            # Obtener información del usuario que registra el pago
-            usuario = self.db.query(Sso_usuario).filter(Sso_usuario.usu_id == usu_id).first()
-            if not usuario:
-                raise ValueError(f"No se encontró el usuario con ID {usu_id}")
-            nombre_usuario = usuario.usu_nombre
-
-            # Filtrar ventas fiadas del cliente
-            ventas_fiadas = (
-                self.db.query(VentaModel)
-                .filter(VentaModel.ven_cliente_fia == nombre_cliente)
-                .filter(VentaModel.ven_transacciones == 2)
-                .all()
-            )
-
-            if not ventas_fiadas:
-                return {"message": f"No hay ventas fiadas pendientes para: {nombre_cliente}"}
-
-            # Calcular total pagado
-            total_pagado = sum(venta.ven_total for venta in ventas_fiadas)
-
-            # Actualizar ventas fiadas
-            for venta in ventas_fiadas:
-                venta.ven_fecha = current_date
-                venta.ven_hora = current_time
-                venta.ven_transacciones = 1  # Cambiar a contado
-                venta.ven_pago = 1  # Marcar como pagado
-                venta.ven_dinero_recibido = venta.ven_total
-
-            # Crear reporte con información completa
-            observacion = (
-                f"El usuario {nombre_usuario} registró el pago de la fianza para {nombre_cliente}\n,"
-                f"Fecha: {current_date}\n,"
-                f"Hora: {current_time}\n,"
-                f"Total pagado: ${total_pagado:,.2f}\n,"
-                f"Ventas actualizadas: {len(ventas_fiadas)}"
-            )
-
-            new_reporte = Reportes(
-                rep_cli=usu_id,
-                rep_asunto=f"Pago fianza - {nombre_cliente}",
-                rep_observacion=observacion,
-                rep_fecha=current_date,
-                rep_hora=current_time
-            )
-            self.db.add(new_reporte)
-
-            self.db.commit()
-
-            return {
-                "success": True,
-                "message": f"Pago registrado por {nombre_usuario}",
-                "cliente": nombre_cliente,
-                "total": float(total_pagado),
-                "ventas_actualizadas": len(ventas_fiadas)
-            }
-
-        except SQLAlchemyError as e:
-            self.db.rollback()
-            raise ValueError(f"Error al registrar pago: {str(e)}")
 
 
     def create_venta(self, venta: Venta, pedidos: list[Pedido], usu_id: int):
@@ -280,11 +148,7 @@ class VentaService:
                     'precio': float(precio_unitario),
                     'subtotal': float(subtotal)
                 })
-
-            # Validar cliente FIA si es necesario
-            if venta.ven_transacciones == 2 and not venta.ven_cliente_fia:
-                raise ValueError("Para ventas fiadas debe especificar un cliente")
-
+            
             # Crear venta
             new_venta = VentaModel(
                 ven_empresa=venta.ven_empresa,
@@ -293,12 +157,11 @@ class VentaService:
                 ven_usuario=venta.ven_usuario,
                 ven_fecha=current_date,
                 ven_hora=current_time,
-                ven_total=Decimal(str(venta.ven_total)).quantize(Decimal('0.00')),
-                ven_cliente_fia=venta.ven_cliente_fia,
+                ven_total=Decimal(str(venta.ven_total)).quantize(Decimal('0.00')),                
                 ven_cliente_contado=venta.ven_cliente_contado,
                 ven_dinero_recibido=Decimal(str(venta.ven_dinero_recibido)).quantize(Decimal('0.00')),
                 ven_cambio=Decimal(str(venta.ven_cambio)).quantize(Decimal('0.00')),
-                ven_descuento=Decimal(str(venta.ven_descuento)).quantize(Decimal('0.00')),
+                ven_descuento=Decimal(str(venta.ven_descuento)).quantize(Decimal('0.00')),                
             )
             self.db.add(new_venta)
             self.db.flush()
@@ -324,11 +187,8 @@ class VentaService:
                 tipo_venta = "CONTADO"
                 cliente_info = f"Cliente: {venta.ven_cliente_contado if venta.ven_cliente_contado else 'No especificado'}"
             elif venta.ven_transacciones == 2:
-                tipo_venta = "FIADO"
-                cliente_info = f"Cliente fiado: {venta.ven_cliente_fia}"
-            elif venta.ven_transacciones == 3:
-                tipo_venta = "REGALADO"
-                cliente_info = "Productos regalados"
+                tipo_venta = "CREDITO"
+                cliente_info = f"Client: {venta.ven_cliente_contado if venta.ven_cliente_contado else 'No especificado'}"           
             
             detalles_productos = "\n".join(
                 [f"- {p['nombre']}: {p['cantidad']} x ${p['precio']:,.2f} = ${p['subtotal']:,.2f}" 
@@ -339,7 +199,7 @@ class VentaService:
                 f"Fecha: {current_date} Hora: {current_time}\n"                
                 f"{cliente_info}\n"
                 f"Total: ${new_venta.ven_total:,.2f}\n"
-                f"Descuento: ${new_venta.ven_descuento:,.2f}\n"
+                f"Descuento: ${new_venta.ven_descuento:,.2f}\n"                
                 f"Dinero recibido: ${new_venta.ven_dinero_recibido:,.2f}\n"
                 f"Cambio: ${new_venta.ven_cambio:,.2f}\n"
                 f"PRODUCTOS VENDIDOS:\n{detalles_productos}"
@@ -368,6 +228,7 @@ class VentaService:
             self.db.rollback()
             raise ValueError(str(ve))
 
+
     def update_venta(self, id: int, venta: Venta, usu_id: int):
         try:
             # Obtener información del usuario y la venta original
@@ -387,12 +248,12 @@ class VentaService:
             # Guardar datos originales para el reporte
             fecha_original = venta_original.ven_fecha
             hora_original = venta_original.ven_hora
-            cliente_nombre = venta_original.ven_cliente_fia or venta_original.ven_cliente_contado or "Cliente no especificado"
+            cliente_nombre = venta_original.ven_cliente_contado or "Cliente no especificado"
 
             # Actualizar la venta
             venta_original.ven_empresa = venta.ven_empresa
-            venta_original.ven_transacciones = 1  # Cambiado a contado
-            venta_original.ven_pago = 1  # Marcado como pagado
+            venta_original.ven_transacciones = 1 
+            venta_original.ven_pago = venta.ven_pago
             venta_original.ven_usuario = venta.ven_usuario
             venta_original.ven_fecha = current_date
             venta_original.ven_hora = current_time
@@ -403,10 +264,10 @@ class VentaService:
 
             # Crear reporte detallado
             observacion = (
-                f"El día {current_date} a las {current_time}, el vendedor {nombre_vendedor} "
-                f"recibió un abono del cliente {cliente_nombre} por la compra realizada "
+                f"El día {current_date} a las {current_time} El cliente efectuó un pago en efectivo por un monto total de ${venta.ven_dinero_recibido:,.2f}, el vendedor {nombre_vendedor} "
+                f"recibió un abono del credito del cliente {cliente_nombre} por la compra realizada de un monto total de ${venta.ven_total:,.2f}.\n"
                 f"el {fecha_original} a las {hora_original}.\n"
-                f"las fechas se actualizan al dia {current_date} a las {current_time}.\n"            
+                f"las fechas se actualizan al dia {current_date} a las {current_time}.\n"                            
             )
 
             new_reporte = Reportes(

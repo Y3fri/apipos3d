@@ -15,6 +15,7 @@ from routers.venta import venta_router
 from routers.pedido import pedido_router
 from routers.perdidas import perdidas_router
 from routers.reportes import reportes_router
+from routers.gastos import gastos_router
 
 app = FastAPI(
     title= 'Tienda1',
@@ -50,7 +51,6 @@ app.include_router(venta_router)
 app.include_router(pedido_router)
 app.include_router(perdidas_router)
 app.include_router(reportes_router)
-
-
+app.include_router(gastos_router)
 
 Base.metadata.create_all(bind=engine)

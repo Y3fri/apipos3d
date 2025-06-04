@@ -16,10 +16,9 @@ class Venta(BaseModel):
     ven_usuario : int
     ven_fecha : date
     ven_hora :time
-    ven_total :float
-    ven_cliente_fia :str
+    ven_total :float    
     ven_cliente_contado :str
     ven_dinero_recibido : float
     ven_cambio : float
-    ven_descuento :float
+    ven_descuento :float    
     
